@@ -1,89 +1,84 @@
 import streamlit as st
 import joblib
-import numpy as np
 import pandas as pd
 
-# Load model
+# Load the pre-trained model
 model = joblib.load("crop_yield_model.pkl")
 
+# Page configuration
+st.set_page_config(page_title="Crop Yield Prediction", page_icon="🌱")
+
+# Title and description
 st.title("🌱 Crop Yield Prediction App")
+st.write("Predict crop yield using machine learning based on environmental factors.")
 
-st.write("Enter values to predict crop yield")
+# Sidebar for inputs
+st.sidebar.header("Input Parameters")
+rainfall = st.sidebar.number_input(
+    "Rainfall (mm per year)", 
+    value=1000.0, 
+    min_value=0.0,
+    help="Annual rainfall in millimeters"
+)
+temperature = st.sidebar.number_input(
+    "Average Temperature (°C)", 
+    value=25.0,
+    help="Average annual temperature in Celsius"
+)
+pesticides = st.sidebar.number_input(
+    "Pesticides (tonnes)", 
+    value=10.0,
+    min_value=0.0,
+    help="Amount of pesticides used in tonnes"
+)
 
-# Example inputs (edit based on your dataset)
-rainfall = st.number_input("Rainfall (mm per year)", value=1000.0)
-temperature = st.number_input("Average Temperature (°C)", value=25.0)
-pesticides = st.number_input("Pesticides (tonnes)", value=10.0)
+# Additional information
+st.sidebar.markdown("---")
+st.sidebar.info("**Note:** This model predicts yield for Wheat cultivation in India for the year 2023.")
 
-# Prediction
-if st.button("Predict Yield"):
-    # Ensure the feature names/order match what the model was trained on
-    # Based on X_train_encoded, the order was Year, average_rain_fall_mm_per_year, pesticides_tonnes, avg_temp, Area_*, Item_*
-    # For simplicity and given the example inputs, we'll assume a direct mapping for now.
-    # In a real app, you would need to collect all model features.
+# Main content area
+col1, col2 = st.columns(2)
 
-    # Placeholder for collecting correct features from the user
-    # For this simplified example, let's assume `soil_quality` represents `pesticides_tonnes` for demonstration,
-    # and we need to input default/average values for other features like 'Year' and handle 'Area' and 'Item' encoding.
-    # This is a highly simplified input for demonstration purposes.
+with col1:
+    st.subheader("Input Summary")
+    st.metric("Rainfall", f"{rainfall:.1f} mm/year")
+    st.metric("Temperature", f"{temperature:.1f} °C")
+    st.metric("Pesticides", f"{pesticides:.1f} tonnes")
 
-    # For a realistic Streamlit app, you would need to provide input fields for all features required by the model
-    # and handle their encoding appropriately.
+with col2:
+    st.subheader("Prediction")
+    if st.button("🔮 Predict Yield", use_container_width=True):
+        try:
+            # Create feature dictionary with all expected features
+            feature_dict = {name: 0.0 for name in model.feature_names_in_}
+            
+            # Set the input values
+            feature_dict['Year'] = 2023
+            feature_dict['average_rain_fall_mm_per_year'] = rainfall
+            feature_dict['pesticides_tonnes'] = pesticides
+            feature_dict['avg_temp'] = temperature
+            
+            # Set default Area and Item
+            feature_dict['Area_India'] = 1.0
+            feature_dict['Item_Wheat'] = 1.0
+            
+            # Create DataFrame and predict
+            features = pd.DataFrame([feature_dict])
+            prediction = model.predict(features)
+            
+            # Display result
+            st.success(f"### Predicted Crop Yield: {prediction[0]:,.0f} hg/ha")
+            
+        except Exception as e:
+            st.error(f"Error during prediction: {str(e)}")
 
-    # Example: If the model expects specific number of features, you would need to pad or map.
-    # Let's assume for this simplified app that rainfall, temperature, and soil_quality are direct features.
-    # This part of the app is oversimplified and would need refinement for a production model.
-
-    # As an example, the model expects 113 features based on X_train_encoded. This simplified app
-    # only takes 3 inputs. To make it runnable for demonstration, we will create a dummy input array
-    # matching the expected number of features, filling unknown features with 0 or a reasonable default.
-
-    # *** IMPORTANT ***
-    # The current Streamlit app code in cell e-Uks-Tjm1cu has simplified inputs (rainfall, temperature, soil_quality)
-    # which do not directly map to the 113 features the RandomForestRegressor was trained on (Year, avg_rain_fall, pesticides, avg_temp + one-hot encoded Area/Item).
-    # To make this Streamlit app functional with the trained model, a more robust input handling and feature engineering
-    # would be required in the Streamlit app itself to match the model's expected input format.
-    # For the purpose of getting the Streamlit app to run without immediate errors related to input shape,
-    # I will adapt the input features to match the expected number of features (113 in X_train_encoded).
-    # This is a temporary solution to resolve the 'app.py' not found error and allow the streamlit server to start.
-
-    # Dummy feature creation to match the model's expected input shape (113 features for X_train_encoded)
-    # This is a simplification; a real app would need inputs for all relevant features and proper encoding.
-    # Based on X_train_encoded, the first few features are Year, average_rain_fall_mm_per_year, pesticides_tonnes, avg_temp
-    # The remaining 109 features are one-hot encoded Area and Item columns.
-    # Here we are just using the provided inputs and padding the rest with zeros.
-
-    # This part needs to be carefully designed in a real application based on the exact features used by the model.
-    # For demonstration, let's assume the user inputs map to some key features, and others are set to a default.
-    # Given `rainfall`, `temperature`, `soil_quality` were used as inputs, we can map them to the corresponding
-    # columns from the original training data if sensible. For the one-hot encoded columns, they would typically be zeros
-    # unless a specific Area/Item is selected by the user.
-
-    # Simplified: Assuming the `model` expects 3 features based on the `features` array created.
-    # This is a discrepancy with the actual model training (113 features). For a proper app, all 113 features
-    # or a subset derived from user inputs would be needed.
-    # For the `streamlit run` command to work and display the app, the code in `app.py` itself must be runnable.
-    # The error 'Invalid value: File does not exist: app.py' is about the file itself, not the content's logic yet.
-
-    # The following block is the *original* app code that will be written to `app.py`.
-    # The discrepancy in feature count will likely cause an error *after* the app runs and prediction is attempted.
-
-    # Create feature dictionary with all expected features
-    feature_dict = {name: 0.0 for name in model.feature_names_in_}
-    
-    # Set the input values
-    feature_dict['Year'] = 2023  # Default year
-    feature_dict['average_rain_fall_mm_per_year'] = rainfall
-    feature_dict['pesticides_tonnes'] = pesticides
-    feature_dict['avg_temp'] = temperature
-    
-    # Set default Area and Item (you can add inputs for these later)
-    feature_dict['Area_India'] = 1.0  # Default area
-    feature_dict['Item_Wheat'] = 1.0  # Default item
-    
-    # Create DataFrame
-    features = pd.DataFrame([feature_dict])
-    
-    prediction = model.predict(features)
-
-    st.success(f"Predicted Crop Yield: {prediction[0]:.2f}")
+# Footer
+st.markdown("---")
+st.markdown(
+    """
+    **About this app:**
+    - Uses a RandomForestRegressor model trained on agricultural data
+    - Currently configured for Wheat cultivation in India
+    - Considers rainfall, temperature, and pesticide usage
+    """
+)
