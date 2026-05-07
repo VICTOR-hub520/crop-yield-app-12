@@ -1,0 +1,15 @@
+Rainfall,Temperature,Pesticides,Area,Item
+1000,25,10,India,Wheat
+1200,22,15,Brazil,Maize
+800,28,8,Egypt,Rice, paddy
+1500,20,12,France,Potatoes
+900,26,7,Nigeria,Sorghum
+1100,24,11,Australia,Soybeans
+1300,23,14,Mexico,Maize
+700,30,6,Kenya,Sorghum
+1400,21,13,Germany,Wheat
+600,32,5,Sudan,Sorghum
+1050,25,10,India,Maize
+1200,22,15,Brazil,Rice, paddy
+800,28,8,Egypt,Wheat
+1500,20,12,France,Maize
