@@ -10,7 +10,7 @@ The Crop Yield Prediction App is a web-based application built with Streamlit th
 - Support for multiple environmental factors (rainfall, temperature, pesticides)
 - Default region and crop type settings for simplified usage
 
-## Architecture
+## Architecture    
 
 ### High-Level Architecture
 ```
