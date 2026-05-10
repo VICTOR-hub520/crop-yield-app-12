@@ -6,6 +6,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 from io import BytesIO
 from PIL import Image
+import time
 try:
     from streamlit_webrtc import webrtc_streamer, RTCConfiguration, WebRtcMode
 except ImportError:
@@ -123,11 +124,15 @@ def hg_per_hectare_to_tons_per_acre(hg_ha):
     lbs_per_acre = hg_per_hectare_to_lbs_per_acre(hg_ha)
     return lbs_per_acre / 2000
 
-# ========== Crop Advisor Knowledge Base ==========
+# ========== Enhanced Crop Advisor Knowledge Base ==========
 advisor_crops = sorted(set(items + [
     "Barley", "Cotton", "Tomatoes", "Sugarcane", "Coffee", "Cocoa",
     "Bananas", "Peanuts", "Sunflower", "Cassava", "Onion", "Pepper",
-    "Lentils", "Chickpeas", "Oats", "Rye", "Sorghum"
+    "Lentils", "Chickpeas", "Oats", "Rye", "Sorghum", "Millet",
+    "Groundnuts", "Sesame", "Tea", "Rubber", "Coconut", "Palm Oil",
+    "Citrus", "Apples", "Grapes", "Mangoes", "Pineapple", "Avocado",
+    "Carrots", "Cabbage", "Lettuce", "Spinach", "Broccoli", "Cauliflower",
+    "Eggplant", "Cucumber", "Squash", "Melon", "Strawberries", "Blueberries"
 ]))
 
 issue_categories = [
@@ -138,101 +143,412 @@ issue_categories = [
     "Weather Stress",
     "Soil Health",
     "Harvest & Storage",
+    "Growth Issues",
+    "Pest Management",
+    "Disease Prevention",
+    "Nutrient Management",
+    "Irrigation Problems",
+    "Climate Adaptation",
     "Auto-detect from notes"
 ]
 
+severity_levels = {
+    "Critical": "Immediate action required - potential crop loss",
+    "High": "Urgent attention needed - significant yield impact",
+    "Medium": "Monitor closely - moderate impact possible",
+    "Low": "Minor issue - watch for progression"
+}
+
+# Enhanced crop knowledge base with detailed advice
 crop_issue_advice = {
     "Wheat": {
-        "Pests/Diseases": "Wheat is prone to rust, aphids, and fusarium head blight. Implement crop rotation and use resistant varieties.",
-        "Water Stress": "Maintain even soil moisture during tillering and heading. Irrigate during dry spells and mulch when possible.",
-        "Nutrient Deficiency": "Wheat responds well to nitrogen and sulfur. Test soil and apply balanced NPK fertilizer.",
-        "Weather Stress": "Protect wheat from late frost and heat during grain fill with appropriate planting dates.",
+        "Pests/Diseases": {
+            "symptoms": ["yellow stripes on leaves", "black sooty mold", "white powdery coating", "brown spots"],
+            "causes": ["Aphids", "Rust fungi", "Powdery mildew", "Septoria leaf blotch"],
+            "severity": "High",
+            "treatment": "Apply systemic insecticides for aphids. Use fungicides for rust and mildew. Rotate crops annually.",
+            "prevention": "Plant resistant varieties, maintain field sanitation, avoid overhead irrigation."
+        },
+        "Water Stress": {
+            "symptoms": ["wilting leaves", "stunted growth", "premature ripening", "reduced grain fill"],
+            "causes": ["Drought", "Poor irrigation timing", "Shallow root penetration"],
+            "severity": "Critical",
+            "treatment": "Irrigate immediately during critical growth stages (tillering, heading, grain fill). Apply mulch to conserve moisture.",
+            "prevention": "Monitor soil moisture regularly, use drip irrigation, improve soil structure for better water retention."
+        },
+        "Nutrient Deficiency": {
+            "symptoms": ["yellow leaves", "purple stems", "stunted growth", "poor grain development"],
+            "causes": ["Nitrogen deficiency", "Phosphorus deficiency", "Potassium deficiency", "Sulfur deficiency"],
+            "severity": "High",
+            "treatment": "Soil test first. Apply balanced NPK fertilizer. For nitrogen, use urea or ammonium nitrate. Monitor pH levels.",
+            "prevention": "Regular soil testing, proper crop rotation, organic matter addition, balanced fertilization program."
+        },
+        "Weather Stress": {
+            "symptoms": ["frost damage", "heat stress", "lodging", "shriveled grains"],
+            "causes": ["Late spring frost", "Heat waves", "High winds", "Excessive rainfall"],
+            "severity": "Critical",
+            "treatment": "For frost: Use frost blankets or sprinkler irrigation. For heat: Provide shade, increase irrigation.",
+            "prevention": "Choose appropriate planting dates, select heat-tolerant varieties, use windbreaks."
+        }
     },
     "Maize": {
-        "Pests/Diseases": "Common pests include fall armyworm and borers. Scout regularly and consider biological controls.",
-        "Water Stress": "Maize needs consistent rainfall from silking to grain fill. Irrigate early and deeply when dry.",
-        "Nutrient Deficiency": "Maize requires high nitrogen and phosphorus. Use soil tests and split fertilizer applications.",
+        "Pests/Diseases": {
+            "symptoms": ["holes in leaves", "sawdust-like frass", "wilted plants", "ear rot"],
+            "causes": ["Fall armyworm", "Corn borer", "Corn rootworm", "Fusarium ear rot"],
+            "severity": "Critical",
+            "treatment": "Use Bt maize varieties, apply biological controls, remove infected plants, use appropriate pesticides.",
+            "prevention": "Crop rotation, field scouting, resistant varieties, proper field sanitation."
+        },
+        "Water Stress": {
+            "symptoms": ["rolled leaves", "silk drying", "poor pollination", "small ears"],
+            "causes": ["Drought during tasseling/silking", "Inconsistent irrigation", "Poor soil drainage"],
+            "severity": "Critical",
+            "treatment": "Irrigate during critical stages, ensure consistent moisture, improve drainage.",
+            "prevention": "Use drought-tolerant varieties, monitor weather forecasts, implement irrigation scheduling."
+        },
+        "Nutrient Deficiency": {
+            "symptoms": ["yellow striping", "purple coloration", "stunted growth", "poor root development"],
+            "causes": ["Nitrogen deficiency", "Phosphorus deficiency", "Zinc deficiency", "Magnesium deficiency"],
+            "severity": "High",
+            "treatment": "Foliar applications for quick response, soil amendments, pH adjustment.",
+            "prevention": "Soil testing, proper fertilization timing, organic matter management."
+        }
     },
     "Rice, paddy": {
-        "Pests/Diseases": "Rice blast and planthoppers can reduce yields. Practice proper water management and resistant varieties.",
-        "Water Stress": "Paddy fields need consistent water depth before heading. Avoid drought stress during flowering.",
-        "Soil Health": "Maintain pH near 6-7 and add organic matter to improve flooded soil structure.",
+        "Pests/Diseases": {
+            "symptoms": ["diamond-shaped lesions", "hopper burn", "stunted tillers", "grain discoloration"],
+            "causes": ["Rice blast", "Brown planthopper", "Rice tungro virus", "Bacterial blight"],
+            "severity": "Critical",
+            "treatment": "Systemic fungicides for blast, insecticides for hoppers, remove alternate hosts.",
+            "prevention": "Balanced fertilization, proper water management, resistant varieties, synchronous planting."
+        },
+        "Water Stress": {
+            "symptoms": ["cracked soil", "stunted growth", "reduced tillering", "poor grain filling"],
+            "causes": ["Inadequate flooding", "Uneven water distribution", "Poor field leveling"],
+            "severity": "High",
+            "treatment": "Maintain proper water depth (5-10cm), ensure uniform distribution, repair bunds.",
+            "prevention": "Proper field preparation, efficient irrigation systems, water management planning."
+        },
+        "Soil Health": {
+            "symptoms": ["nutrient imbalances", "poor drainage", "acidic/alkaline conditions", "compacted layers"],
+            "causes": ["Continuous flooding", "Nutrient depletion", "Poor organic matter", "Iron toxicity"],
+            "severity": "Medium",
+            "treatment": "Lime application for acidity, organic matter addition, proper water management.",
+            "prevention": "Crop rotation, green manuring, balanced fertilization, periodic soil testing."
+        }
     },
     "Potatoes": {
-        "Pests/Diseases": "Late blight and tuber rot are major threats. Use clean seed potatoes and fungicide protection.",
-        "Water Stress": "Keep soil evenly moist, especially during tuber bulking, but avoid waterlogging.",
-    },
-    "Soybeans": {
-        "Pests/Diseases": "Soybean cyst nematode and sudden death syndrome can lower yields. Rotate with non-host crops.",
-        "Nutrient Deficiency": "Soybeans benefit from phosphorus and potassium. Nodulation fixes nitrogen if soil is healthy.",
-    },
-    "Barley": {
-        "Pests/Diseases": "Net blotch and powdery mildew are common. Use certified seed and manage residue.",
-        "Water Stress": "Barley is sensitive to drought during flowering. Schedule irrigation carefully.",
+        "Pests/Diseases": {
+            "symptoms": ["dark water-soaked spots", "white fungal growth", "tuber rot", "yellowing leaves"],
+            "causes": ["Late blight", "Early blight", "Potato virus Y", "Common scab"],
+            "severity": "Critical",
+            "treatment": "Fungicide applications, remove infected plants, proper seed treatment.",
+            "prevention": "Certified seed potatoes, crop rotation, field sanitation, resistant varieties."
+        },
+        "Growth Issues": {
+            "symptoms": ["small tubers", "green tubers", "cracked skin", "hollow heart"],
+            "causes": ["Poor soil conditions", "Temperature stress", "Irrigation issues", "Varietal characteristics"],
+            "severity": "Medium",
+            "treatment": "Adjust irrigation, ensure proper hilling, temperature management.",
+            "prevention": "Proper soil preparation, appropriate planting depth, variety selection."
+        }
     },
     "Tomatoes": {
-        "Pests/Diseases": "Tomato blight and nematodes can cause severe damage. Ensure good air circulation and rotate crops.",
-        "Nutrient Deficiency": "Tomatoes need calcium to prevent blossom end rot. Apply balanced fertilizer and irrigate consistently.",
+        "Pests/Diseases": {
+            "symptoms": ["blossom end rot", "yellow leaves", "fruit cracking", "fungal spots"],
+            "causes": ["Calcium deficiency", "Fusarium wilt", "Bacterial spot", "Tomato mosaic virus"],
+            "severity": "High",
+            "treatment": "Calcium sprays for BER, fungicides for diseases, remove infected plants.",
+            "prevention": "Proper calcium management, resistant varieties, good air circulation, crop rotation."
+        },
+        "Nutrient Deficiency": {
+            "symptoms": ["yellowing between veins", "purple stems", "small leaves", "poor fruit set"],
+            "causes": ["Magnesium deficiency", "Phosphorus deficiency", "Potassium deficiency", "Iron deficiency"],
+            "severity": "Medium",
+            "treatment": "Foliar fertilization, soil amendments, pH correction.",
+            "prevention": "Regular soil testing, balanced fertilization, organic matter addition."
+        }
+    },
+    "Cotton": {
+        "Pests/Diseases": {
+            "symptoms": ["boll damage", "leaf curling", "square dropping", "fungal spots"],
+            "causes": ["Bollworm", "Aphids", "Whitefly", "Bacterial blight"],
+            "severity": "Critical",
+            "treatment": "Integrated pest management, biological controls, selective pesticides.",
+            "prevention": "Scouting programs, resistant varieties, proper field sanitation."
+        },
+        "Water Stress": {
+            "symptoms": ["premature boll opening", "leaf wilting", "reduced fiber quality", "stunted growth"],
+            "causes": ["Drought stress", "Poor irrigation scheduling", "High temperatures"],
+            "severity": "High",
+            "treatment": "Supplemental irrigation, mulching, shade provision.",
+            "prevention": "Drought-tolerant varieties, efficient irrigation systems, soil moisture monitoring."
+        }
     },
     "Sugarcane": {
-        "Pests/Diseases": "Ratoon stunting disease and borers are key issues. Use clean planting material and maintain healthy soil.",
-        "Water Stress": "Sugarcane requires high water at early growth stages. Provide consistent irrigation where possible.",
+        "Pests/Diseases": {
+            "symptoms": ["stunted growth", "yellowing", "borer holes", "red rot"],
+            "causes": ["Ratoon stunting disease", "Sugarcane borer", "Red rot", "Smuts"],
+            "severity": "High",
+            "treatment": "Hot water treatment of seed, systemic insecticides, fungicide applications.",
+            "prevention": "Disease-free planting material, proper crop rotation, field sanitation."
+        },
+        "Nutrient Management": {
+            "symptoms": ["chlorosis", "reduced tillering", "poor growth", "low sucrose content"],
+            "causes": ["Imbalanced fertilization", "Soil nutrient depletion", "pH imbalances"],
+            "severity": "Medium",
+            "treatment": "Soil testing, balanced NPK application, micronutrient supplementation.",
+            "prevention": "Regular soil analysis, proper manure application, crop residue management."
+        }
     },
+    "Soybeans": {
+        "Pests/Diseases": {
+            "symptoms": ["cyst formation", "sudden wilting", "leaf spots", "pod damage"],
+            "causes": ["Soybean cyst nematode", "Sudden death syndrome", "Frogeye leaf spot", "Pod borers"],
+            "severity": "High",
+            "treatment": "Nematicides, fungicide applications, resistant varieties.",
+            "prevention": "Crop rotation, soil testing, seed treatment, field scouting."
+        },
+        "Nutrient Deficiency": {
+            "symptoms": ["yellowing leaves", "poor nodulation", "stunted growth", "low protein content"],
+            "causes": ["Nitrogen fixation issues", "Phosphorus deficiency", "Iron deficiency"],
+            "severity": "Medium",
+            "treatment": "Inoculant application, phosphorus fertilizers, micronutrient sprays.",
+            "prevention": "Proper inoculation, balanced fertilization, soil pH management."
+        }
+    }
 }
 
+# Enhanced generic advice for issues not crop-specific
 generic_issue_advice = {
-    "Pests/Diseases": "Inspect crops weekly for pests and disease symptoms, rotate crops annually, and use resistant varieties when available.",
-    "Water Stress": "Monitor soil moisture and adjust irrigation schedules. Avoid both drought and waterlogging.",
-    "Nutrient Deficiency": "Soil test before fertilization and apply balanced nutrients based on crop needs.",
-    "Weed Pressure": "Use mulches, cover crops, and timely weeding to reduce competition.",
-    "Weather Stress": "Match planting time to climate conditions and protect against extreme heat or frost.",
-    "Soil Health": "Add organic matter, avoid compaction, and maintain proper pH for healthy root growth.",
-    "Harvest & Storage": "Harvest at the right maturity and store in cool, dry conditions to prevent spoilage.",
+    "Pests/Diseases": {
+        "description": "Pest and disease management requires integrated approaches",
+        "immediate_actions": ["Identify the pest/disease correctly", "Isolate affected plants", "Remove severely infected material"],
+        "treatment_options": ["Biological controls", "Cultural practices", "Chemical treatments when necessary"],
+        "prevention": ["Crop rotation", "Resistant varieties", "Field sanitation", "Regular scouting"]
+    },
+    "Water Stress": {
+        "description": "Water management is critical for crop health and yield",
+        "immediate_actions": ["Check soil moisture levels", "Adjust irrigation schedules", "Mulch to conserve moisture"],
+        "treatment_options": ["Supplemental irrigation", "Drought-tolerant varieties", "Soil moisture sensors"],
+        "prevention": ["Proper irrigation planning", "Rainwater harvesting", "Soil water retention improvements"]
+    },
+    "Nutrient Deficiency": {
+        "description": "Proper nutrition is essential for healthy crop development",
+        "immediate_actions": ["Soil testing", "Foliar fertilization for quick response", "pH adjustment if needed"],
+        "treatment_options": ["Balanced fertilizers", "Organic amendments", "Micronutrient applications"],
+        "prevention": ["Regular soil testing", "Crop rotation", "Organic matter management"]
+    },
+    "Weed Pressure": {
+        "description": "Weeds compete for resources and reduce yields significantly",
+        "immediate_actions": ["Identify weed species", "Manual weeding for small areas", "Herbicide application"],
+        "treatment_options": ["Pre-emergent herbicides", "Post-emergent treatments", "Mechanical control"],
+        "prevention": ["Mulching", "Cover crops", "Proper crop spacing", "Crop rotation"]
+    },
+    "Weather Stress": {
+        "description": "Extreme weather events can severely impact crop production",
+        "immediate_actions": ["Protect vulnerable crops", "Adjust management practices", "Monitor weather forecasts"],
+        "treatment_options": ["Shade structures", "Windbreaks", "Supplemental irrigation"],
+        "prevention": ["Climate-appropriate varieties", "Seasonal planning", "Risk management strategies"]
+    },
+    "Soil Health": {
+        "description": "Healthy soil is the foundation of successful agriculture",
+        "immediate_actions": ["Soil testing", "Organic matter addition", "pH correction"],
+        "treatment_options": ["Liming/acidification", "Compost application", "Cover cropping"],
+        "prevention": ["Conservation tillage", "Crop rotation", "Erosion control", "Regular monitoring"]
+    },
+    "Harvest & Storage": {
+        "description": "Proper harvesting and storage prevents post-harvest losses",
+        "immediate_actions": ["Harvest at optimal maturity", "Handle gently", "Dry properly"],
+        "treatment_options": ["Temperature control", "Humidity management", "Pest control in storage"],
+        "prevention": ["Proper timing", "Clean storage facilities", "Regular inspection"]
+    },
+    "Growth Issues": {
+        "description": "Various factors can affect normal crop development",
+        "immediate_actions": ["Identify stress factors", "Adjust management", "Protect young plants"],
+        "treatment_options": ["Nutrient adjustments", "Pest control", "Environmental modifications"],
+        "prevention": ["Proper planting", "Variety selection", "Site preparation"]
+    }
 }
 
+# Enhanced keyword detection with more patterns and context
 issue_keywords = {
+    # Water stress indicators
     "drought": "Water Stress",
     "dry": "Water Stress",
-    "wet": "Weather Stress",
-    "heat": "Weather Stress",
-    "cold": "Weather Stress",
+    "wilting": "Water Stress",
+    "wilted": "Water Stress",
+    "cracked soil": "Water Stress",
+    "water stress": "Water Stress",
+    "dehydration": "Water Stress",
+
+    # Nutrient deficiencies
     "yellow": "Nutrient Deficiency",
+    "yellowing": "Nutrient Deficiency",
+    "chlorosis": "Nutrient Deficiency",
     "necrosis": "Nutrient Deficiency",
+    "stunted": "Nutrient Deficiency",
+    "stunting": "Nutrient Deficiency",
+    "purple stems": "Nutrient Deficiency",
+    "interveinal chlorosis": "Nutrient Deficiency",
+
+    # Pests and diseases
     "pest": "Pests/Diseases",
     "disease": "Pests/Diseases",
-    "weed": "Weed Pressure",
-    "salinity": "Soil Health",
-    "compaction": "Soil Health",
+    "infection": "Pests/Diseases",
+    "infestation": "Pests/Diseases",
+    "spots": "Pests/Diseases",
+    "lesions": "Pests/Diseases",
+    "mold": "Pests/Diseases",
+    "fungus": "Pests/Diseases",
     "rot": "Pests/Diseases",
     "blight": "Pests/Diseases",
+    "mildew": "Pests/Diseases",
+    "rust": "Pests/Diseases",
+
+    # Weed pressure
+    "weed": "Weed Pressure",
+    "weeds": "Weed Pressure",
+    "competition": "Weed Pressure",
+
+    # Weather stress
+    "heat": "Weather Stress",
+    "cold": "Weather Stress",
+    "frost": "Weather Stress",
+    "hail": "Weather Stress",
+    "wind": "Weather Stress",
+    "storm": "Weather Stress",
+
+    # Soil health
+    "salinity": "Soil Health",
+    "saline": "Soil Health",
+    "compaction": "Soil Health",
+    "erosion": "Soil Health",
+    "acidic": "Soil Health",
+    "alkaline": "Soil Health",
+
+    # Growth issues
+    "slow growth": "Growth Issues",
+    "poor germination": "Growth Issues",
+    "seedling death": "Growth Issues",
+    "abnormal growth": "Growth Issues"
 }
 
-def infer_issue_type(text):
-    lower = text.lower()
+# Symptom pattern matching for better auto-detection
+symptom_patterns = {
+    "Water Stress": [
+        r"wilting|wilted|drooping|dry.*soil|cracked.*soil",
+        r"rolled.*leaves|curled.*leaves|dry.*leaves",
+        r"stunted.*growth|slow.*growth|poor.*growth"
+    ],
+    "Nutrient Deficiency": [
+        r"yellow.*leaves|yellowing.*leaves|chlorotic",
+        r"purple.*stems|red.*stems|discolored.*stems",
+        r"interveinal.*chlorosis|vein.*chlorosis",
+        r"stunted.*growth|small.*leaves|poor.*development"
+    ],
+    "Pests/Diseases": [
+        r"holes.*leaves|chewed.*leaves|damaged.*leaves",
+        r"spots.*leaves|lesions.*leaves|blotches",
+        r"mold|mildew|fungus|rust|blight",
+        r"borer.*holes|insect.*damage|pest.*damage"
+    ]
+}
+
+def analyze_symptoms(text):
+    """Advanced symptom analysis using pattern matching"""
+    text_lower = text.lower()
+    detected_issues = {}
+
+    # Check keyword matches
     for keyword, issue in issue_keywords.items():
-        if keyword in lower:
-            return issue
+        if keyword in text_lower:
+            detected_issues[issue] = detected_issues.get(issue, 0) + 1
+
+    # Check pattern matches for more sophisticated detection
+    for issue, patterns in symptom_patterns.items():
+        for pattern in patterns:
+            if re.search(pattern, text_lower, re.IGNORECASE):
+                detected_issues[issue] = detected_issues.get(issue, 0) + 2  # Weight patterns higher
+
+    # Return the most likely issue
+    if detected_issues:
+        return max(detected_issues.items(), key=lambda x: x[1])[0]
     return None
 
-
 def get_crop_advice(crop, issue_type, region=None, notes=None):
+    """Enhanced crop advice function with detailed analysis"""
     crop = crop.title()
+
+    # Auto-detect issue type from notes if requested
     if issue_type == "Auto-detect from notes" and notes:
-        detected = infer_issue_type(notes)
+        detected = analyze_symptoms(notes)
         if detected:
             issue_type = detected
         else:
-            issue_type = "Pests/Diseases"
+            issue_type = "Pests/Diseases"  # Default fallback
 
-    advice = crop_issue_advice.get(crop, {})
-    if issue_type in advice:
-        text = advice[issue_type]
+    # Get crop-specific advice
+    crop_advice = crop_issue_advice.get(crop, {})
+
+    if issue_type in crop_advice:
+        advice_data = crop_advice[issue_type]
+        severity = advice_data.get("severity", "Medium")
+        severity_desc = severity_levels.get(severity, "")
+
+        response = f"""
+### **{issue_type} in {crop}**
+
+**Severity Level:** {severity} - {severity_desc}
+
+**Common Symptoms:**
+• {chr(10).join(f"- {symptom}" for symptom in advice_data.get("symptoms", ["Various symptoms possible"]))}
+
+**Likely Causes:**
+• {chr(10).join(f"- {cause}" for cause in advice_data.get("causes", ["Multiple factors possible"]))}
+
+**Recommended Treatment:**
+{advice_data.get("treatment", "Consult local agricultural extension services.")}
+
+**Prevention Strategies:**
+{advice_data.get("prevention", "Implement good agricultural practices and regular monitoring.")}
+"""
     else:
-        text = generic_issue_advice.get(issue_type, "Review crop health and consult local extension services for more detail.")
+        # Use generic advice
+        generic_data = generic_issue_advice.get(issue_type, {})
+        if generic_data:
+            response = f"""
+### **{issue_type} Management**
 
+**Description:** {generic_data.get("description", "General agricultural issue.")}
+
+**Immediate Actions:**
+• {chr(10).join(f"- {action}" for action in generic_data.get("immediate_actions", ["Monitor closely"]))}
+
+**Treatment Options:**
+• {chr(10).join(f"- {option}" for option in generic_data.get("treatment_options", ["Various approaches available"]))}
+
+**Prevention:**
+• {chr(10).join(f"- {prevent}" for action in generic_data.get("prevention", ["Regular monitoring and good practices"]))}
+"""
+        else:
+            response = f"**{issue_type}** - Limited specific information available for {crop}. Please consult local agricultural extension services or crop specialists for detailed advice."
+
+    # Add regional considerations
     if region:
-        text += f" Local conditions in {region.title()} may affect the issue. Consider region-specific resistant varieties and management practices."
-    return text
+        response += f"\n\n**Regional Considerations for {region.title()}:**\n" \
+                   f"Local climate, soil conditions, and pest pressures in {region.title()} may require " \
+                   f"adjustments to these recommendations. Consider consulting regional agricultural " \
+                   f"extension services for location-specific advice."
+
+    # Add general monitoring advice
+    response += f"\n\n**General Recommendations:**\n" \
+               f"- Monitor crop health regularly and document changes\n" \
+               f"- Keep detailed records of treatments and their effectiveness\n" \
+               f"- Consider integrated pest/disease management approaches\n" \
+               f"- Consult with local agricultural experts for complex issues"
+
+    return response
 
 # Page configuration
 st.set_page_config(
@@ -312,8 +628,8 @@ yield_unit = st.sidebar.radio(
 st.sidebar.caption("Choose the output yield unit used throughout the app.")
 
 # Create tabs for different features
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
-    ["Single Prediction", "Sensitivity Analysis", "Batch Predictions", "Trends & Comparison", "Image Analysis", "Voice Input", "Crop Advisor"]
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
+    ["Single Prediction", "Sensitivity Analysis", "Batch Predictions", "Trends & Comparison", "Image Analysis", "Crop Advisor"]
 )
 
 # ========== TAB 1: SINGLE PREDICTION ==========
@@ -355,7 +671,8 @@ with tab1:
             "Country/Region",
             options=areas,
             index=areas.index("India") if "India" in areas else 0,
-            help="Select the country or region"
+            help="Select the country or region",
+            key="selected_area"
         )
     
     with col3:
@@ -364,7 +681,8 @@ with tab1:
             "Crop Type",
             options=items,
             index=items.index("Wheat") if "Wheat" in items else 0,
-            help="Select the crop type"
+            help="Select the crop type",
+            key="selected_item"
         )
     
     # Validate inputs
@@ -524,91 +842,67 @@ with tab2:
 with tab3:
     st.subheader("Batch Predictions from CSV")
     st.write("Upload a CSV file with columns: `Rainfall`, `Temperature`, `Pesticides`, `Area`, `Item`")
-    
+
+    batch_year = st.slider("Prediction Year", min_value=1990, max_value=2040, value=2025, step=1)
+    yield_unit_batch = st.selectbox(
+        "Yield Unit",
+        options=["hg/ha", "lbs/acre (Pounds/Acre)", "tons/acre (Short Tons/Acre)"],
+        index=0,
+        help="Choose the unit for batch predictions",
+        key="yield_unit_batch"
+    )
+
     uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
-    
+
     if uploaded_file is not None:
         try:
             df = pd.read_csv(uploaded_file)
             df.columns = df.columns.str.strip()
             df = merge_duplicate_columns(df)
-            
+
             # Validate required columns
             required_cols = ['Rainfall', 'Temperature', 'Pesticides', 'Area', 'Item']
             missing_cols = [col for col in required_cols if col not in df.columns]
-            
+
             if missing_cols:
                 st.error(f"Missing columns: {', '.join(missing_cols)}")
             else:
                 st.write(f"Loaded {len(df)} rows. Processing predictions...")
-                
-                # Add predictions
-                predictions = []
+
                 with st.spinner("Running batch predictions..."):
-                    for idx, row in df.iterrows():
-                        pred = predict_yield(
+                    df['Predicted_Yield_hg_ha'] = df.apply(
+                        lambda row: predict_yield(
                             row['Rainfall'],
                             row['Temperature'],
                             row['Pesticides'],
-                            year,
-                            row['Area'],
-                            row['Item']
-                        )
-                        predictions.append(pred)
-                
-                df['Predicted_Yield_hg_ha'] = predictions
-                
-                # Add unit-converted columns
-                df['Predicted_Yield_lbs_acre'] = df['Predicted_Yield_hg_ha'].apply(hg_per_hectare_to_lbs_per_acre)
-                df['Predicted_Yield_tons_acre'] = df['Predicted_Yield_hg_ha'].apply(hg_per_hectare_to_tons_per_acre)
-                
-                st.write("**Predictions with All Unit Conversions:**")
-                st.dataframe(df, width='stretch')
-                
-                # Download button - let user choose format
-                st.write("**Download Results:**")
-                col_dl1, col_dl2 = st.columns(2)
-                
-                with col_dl1:
-                    # Full data with all units
-                    csv_buffer = BytesIO()
-                    df.to_csv(csv_buffer, index=False)
-                    csv_buffer.seek(0)
-                    
-                    st.download_button(
-                        label="Download (All Units)",
-                        data=csv_buffer,
-                        file_name="crop_yield_predictions_all_units.csv",
-                        mime="text/csv",
-                        width='stretch'
+                            batch_year,
+                            row['Area']
+                        ),
+                        axis=1
                     )
-                
-                with col_dl2:
-                    # Simplified data with selected unit
-                    df_download = df.copy()
-                    if yield_unit == "lbs/acre (Pounds/Acre)":
-                        df_download = df_download[['Rainfall', 'Temperature', 'Pesticides', 'Area', 'Item', 'Predicted_Yield_lbs_acre']]
-                        df_download = df_download.rename(columns={'Predicted_Yield_lbs_acre': 'Predicted_Yield'})
-                        filename = "crop_yield_predictions_lbs_acre.csv"
-                    elif yield_unit == "tons/acre (Short Tons/Acre)":
-                        df_download = df_download[['Rainfall', 'Temperature', 'Pesticides', 'Area', 'Item', 'Predicted_Yield_tons_acre']]
-                        df_download = df_download.rename(columns={'Predicted_Yield_tons_acre': 'Predicted_Yield'})
-                        filename = "crop_yield_predictions_tons_acre.csv"
-                    else:
-                        df_download = df_download[['Rainfall', 'Temperature', 'Pesticides', 'Area', 'Item', 'Predicted_Yield_hg_ha']]
-                        df_download = df_download.rename(columns={'Predicted_Yield_hg_ha': 'Predicted_Yield'})
-                        filename = "crop_yield_predictions_hg_ha.csv"
-                    
-                    csv_buffer2 = BytesIO()
-                    df_download.to_csv(csv_buffer2, index=False)
-                    csv_buffer2.seek(0)
-                    
-                    st.download_button(
-                        label=f"Download ({yield_unit.split('(')[1].rstrip(')')})",
-                        data=csv_buffer2,
-                        file_name=filename,
-                        mime="text/csv",
-                        width='stretch'
+
+                if yield_unit_batch == "lbs/acre (Pounds/Acre)":
+                    df['Predicted_Yield'] = df['Predicted_Yield_hg_ha'].apply(hg_per_hectare_to_lbs_per_acre)
+                    unit_label = "lbs/acre"
+                elif yield_unit_batch == "tons/acre (Short Tons/Acre)":
+                    df['Predicted_Yield'] = df['Predicted_Yield_hg_ha'].apply(hg_per_hectare_to_tons_per_acre)
+                    unit_label = "tons/acre"
+                else:
+                    df['Predicted_Yield'] = df['Predicted_Yield_hg_ha']
+                    unit_label = "hg/ha"
+
+                st.success("Batch predictions completed!")
+                st.dataframe(df[['Rainfall', 'Temperature', 'Pesticides', 'Area', 'Item', 'Predicted_Yield']])
+
+                csv_buffer = BytesIO()
+                df.to_csv(csv_buffer, index=False)
+                csv_buffer.seek(0)
+
+                st.download_button(
+                    label=f"Download predictions ({unit_label})",
+                    data=csv_buffer,
+                    file_name=f"batch_predictions_{batch_year}.csv",
+                    mime="text/csv"
                 )
         except Exception as e:
             st.error(f"❌ Error processing file: {str(e)}")
@@ -761,144 +1055,139 @@ with tab5:
     else:
         st.info("Upload a crop image to begin analysis")
 
-# ========== TAB 6: VOICE INPUT ==========
 with tab6:
-    st.subheader("Voice-Controlled Prediction")
-    st.write("Use microphone input to control the prediction system (text-based voice simulation).")
-    
-    voice_option = st.radio("Select Input Method", ["Manual Voice Simulation", "Microphone Stream"])
-    
-    if voice_option == "Manual Voice Simulation":
-        st.info("This simulates voice input through text. Type your prediction request:")
-        st.caption("Example: Predict wheat yield in India for 2025 with 1000mm rain, 25°C, 10 tonnes pesticides")
-        voice_input = st.text_area(
-            "Voice Input (Simulated)",
-            placeholder="Example: Predict wheat yield in India for 2025 with 1000mm rainfall, 25 degrees temperature, and 10 tonnes pesticides",
-            height=100
-        )
-        
-        if st.button("Process Voice Command", width='stretch', type="primary"):
-            if voice_input:
-                st.write("**Parsing Voice Command...**")
-                
-                # Simple parsing (in production, use NLP)
-                try:
-                    # Default values
-                    voice_rainfall = 1000.0
-                    voice_temp = 25.0
-                    voice_pesticides = 10.0
-                    voice_country = "India"
-                    voice_crop = "Wheat"
-                    voice_year = 2025
-                    
-                    # Try to extract numbers
-                    import re
-                    numbers = re.findall(r'\d+(?:\.\d+)?', voice_input)
-                    
-                    if len(numbers) >= 1:
-                        voice_rainfall = min(float(numbers[0]), 10000.0)
-                    if len(numbers) >= 2:
-                        voice_temp = min(float(numbers[1]), 60.0)
-                    if len(numbers) >= 3:
-                        voice_pesticides = min(float(numbers[2]), 1000.0)
-                    # Find a year between 1900 and 2100 if present
-                    if len(numbers) >= 1:
-                        for num in numbers:
-                            year_candidate = float(num)
-                            if 1900 <= year_candidate <= 2100:
-                                voice_year = int(year_candidate)
-                                break
-                    
-                    # Check for country/crop names
-                    voice_input_lower = voice_input.lower()
-                    for area in areas:
-                        if area.lower() in voice_input_lower:
-                            voice_country = area
-                            break
-                    
-                    for item in items:
-                        if item.lower() in voice_input_lower:
-                            voice_crop = item
-                            break
-                    
-                    st.success("Command parsed successfully!")
-                    
-                    # Display parsed values
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        st.metric("Rainfall", f"{voice_rainfall:.0f} mm/year")
-                    with col2:
-                        st.metric("Temperature", f"{voice_temp:.1f}°C")
-                    with col3:
-                        st.metric("Pesticides", f"{voice_pesticides:.1f} tonnes")
-                    
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        st.metric("Country", voice_country)
-                    with col2:
-                        st.metric("Crop", voice_crop)
-                    with col3:
-                        st.metric("Year", str(voice_year))
-                    
-                    # Make prediction
-                    voice_prediction = predict_yield(voice_rainfall, voice_temp, voice_pesticides, voice_year, voice_country, voice_crop)
-                    
-                    if voice_prediction is not None:
-                        st.success(f"### Yield Prediction: {voice_prediction:,.0f} hg/ha")
-                        st.balloons()
-                
-                except Exception as e:
-                    st.error(f"❌ Error parsing command: {str(e)}")
-            else:
-                st.warning("Please enter a voice command")
-    
-    else:  # Microphone Stream
-        if webrtc_streamer is not None:
-            st.info("Microphone features require additional runtime. Use 'Manual Voice Simulation' for text-based commands.")
-            st.write("**Note:** For full microphone streaming in production, use streamlit-webrtc with proper browser support.")
-        else:
-            st.warning("Microphone streaming not yet available. Use text-based voice input above.")
-    
-    st.divider()
-    st.write("**Voice Command Examples:**")
-    st.code("""
-Predict wheat yield in India for 2025 with 1000mm rain, 25°C, 10 tonnes pesticides
-Get maize prediction for Brazil, 1500mm rainfall, 22 degrees, 15 tonnes pesticides
-Calculate rice yield in Egypt, 800mm rain, 28 degrees, 8 tonnes pesticides
-    """)
+    st.subheader("🧠 Advanced Crop Advisor Bot")
+    st.write("Get detailed, AI-enhanced crop advice with symptom analysis and comprehensive recommendations.")
 
-# ========== TAB 7: CROP ADVISOR ==========
-with tab7:
-    st.subheader("Crop Advisor Bot")
-    st.write("Ask about crop issues, pests, diseases and growing conditions.")
-    
+    # Enhanced UI with symptom checklist
     col1, col2 = st.columns([1, 1])
+
     with col1:
-        advisor_crop = st.selectbox("Crop", options=advisor_crops, index=advisor_crops.index("Wheat") if "Wheat" in advisor_crops else 0)
-        advisor_issue = st.selectbox("Problem Type", options=issue_categories)
+        st.markdown("### 🌾 Crop & Issue Selection")
+        advisor_crop = st.selectbox(
+            "Select Crop",
+            options=advisor_crops,
+            index=advisor_crops.index("Wheat") if "Wheat" in advisor_crops else 0,
+            help="Choose the crop you're having issues with",
+            key="advisor_crop"
+        )
+
+        advisor_issue = st.selectbox(
+            "Problem Category",
+            options=issue_categories,
+            help="Select the type of problem or choose auto-detection",
+            key="advisor_issue"
+        )
+
+        advisor_region = st.text_input(
+            "Region/Location (optional)",
+            help="Enter your region for location-specific advice"
+        )
+
     with col2:
-        advisor_region = st.text_input("Region (optional)", help="Optional region for localized advice")
-        advisor_notes = st.text_area("Describe the problem or symptoms", height=120, help="Add details such as yellow leaves, stunted growth, pests, etc.")
-    
-    if st.button("Get Crop Advice", width='stretch', type="primary"):
-        with st.spinner("Analyzing crop issue..."):
-            advice_text = get_crop_advice(advisor_crop, advisor_issue, advisor_region, advisor_notes)
-        
-        st.success("Advice generated")
-        st.write(f"**Crop:** {advisor_crop}")
-        st.write(f"**Issue Type:** {advisor_issue}")
-        if advisor_region:
-            st.write(f"**Region:** {advisor_region.title()}")
-        if advisor_notes:
-            st.write("**Symptoms:**")
-            st.write(advisor_notes)
-        st.markdown("---")
-        st.write(advice_text)
-        
-        if advisor_crop in items:
-            st.info("This crop is also supported by the yield prediction model. Use the Single Prediction tab for yield estimates.")
+        st.markdown("### 🔍 Symptom Analysis")
+        st.write("Describe symptoms or use the auto-detection feature:")
+
+        # Symptom input area
+        advisor_notes = st.text_area(
+            "Describe symptoms, observations, or problems",
+            height=120,
+            placeholder="Example: Yellow leaves with brown spots, stunted growth, holes in leaves, wilting plants...",
+            help="Be specific about what you observe - colors, patterns, affected plant parts, timing, etc."
+        )
+
+        # Quick symptom checklist
+        with st.expander("📋 Quick Symptom Checklist"):
+            st.write("Check all that apply:")
+            symptom_checks = []
+            if st.checkbox("Yellow/chlorotic leaves"): symptom_checks.append("yellow leaves")
+            if st.checkbox("Brown spots or lesions"): symptom_checks.append("brown spots on leaves")
+            if st.checkbox("Wilting or drooping"): symptom_checks.append("wilting plants")
+            if st.checkbox("Holes in leaves"): symptom_checks.append("holes in leaves")
+            if st.checkbox("Stunted growth"): symptom_checks.append("stunted growth")
+            if st.checkbox("White powdery coating"): symptom_checks.append("white powdery coating")
+            if st.checkbox("Curled or distorted leaves"): symptom_checks.append("curled leaves")
+            if st.checkbox("Root problems"): symptom_checks.append("root rot or damage")
+
+            if symptom_checks:
+                auto_symptoms = ", ".join(symptom_checks)
+                if st.button("Add to description"):
+                    advisor_notes = auto_symptoms + ("; " + advisor_notes if advisor_notes else "")
+
+    # Analysis and advice generation
+    if st.button("🔬 Analyze & Get Advice", type="primary", use_container_width=True):
+        if not advisor_notes and advisor_issue == "Auto-detect from notes":
+            st.error("Please describe symptoms or select a specific problem category for auto-detection to work.")
         else:
-            st.info("This crop is advisory-only; yield prediction is not available for this crop in the current model.")
+            with st.spinner("🤖 Analyzing symptoms and generating comprehensive advice..."):
+                time.sleep(1)  # Simulate processing time
+                advice_text = get_crop_advice(advisor_crop, advisor_issue, advisor_region, advisor_notes)
+
+            st.success("✅ Analysis Complete - Detailed advice generated!")
+
+            # Display results in organized sections
+            st.markdown("---")
+
+            # Summary card
+            col_summary1, col_summary2 = st.columns(2)
+            with col_summary1:
+                st.metric("Crop", advisor_crop)
+                st.metric("Issue Type", advisor_issue)
+            with col_summary2:
+                if advisor_region:
+                    st.metric("Region", advisor_region.title())
+                if advisor_notes:
+                    st.metric("Symptoms Described", "Yes")
+
+            st.markdown("---")
+
+            # Main advice display
+            st.markdown(advice_text)
+
+            # Additional resources section
+            with st.expander("📚 Additional Resources & Tips"):
+                st.markdown("""
+                **Monitoring & Documentation:**
+                - Keep a crop health journal with photos and observations
+                - Track weather patterns and their correlation with symptoms
+                - Record all treatments and their effectiveness
+
+                **Professional Consultation:**
+                - Contact local agricultural extension services
+                - Consult certified crop advisors or agronomists
+                - Join local farming communities for peer advice
+
+                **Preventive Measures:**
+                - Regular field scouting (at least weekly)
+                - Soil testing every 2-3 years
+                - Proper crop rotation planning
+                - Integrated Pest Management (IPM) practices
+                """)
+
+            # Related crops info
+            if advisor_crop in items:
+                st.info(f"💡 **Pro Tip:** {advisor_crop} is supported by our yield prediction model. Use the 'Single Prediction' tab to estimate potential yields under different conditions.")
+            else:
+                st.info(f"💡 **Note:** {advisor_crop} advisory data is available, but yield prediction modeling requires additional crop-specific data.")
+
+    # Quick tips section
+    st.markdown("---")
+    with st.expander("🚀 Quick Farming Tips"):
+        st.markdown("""
+        **General Best Practices:**
+        - **Scout regularly:** Walk your fields at least once a week to catch problems early
+        - **Keep records:** Document everything - weather, treatments, yields, problems
+        - **Soil testing:** Test your soil every 2-3 years for optimal nutrient management
+        - **Crop rotation:** Rotate crops to break pest and disease cycles
+        - **Water management:** Monitor soil moisture and avoid over/under watering
+        - **Integrated approaches:** Combine cultural, biological, and chemical methods when needed
+
+        **When to Seek Help:**
+        - Symptoms persist despite treatment
+        - Unidentified problems or unusual symptoms
+        - Significant yield losses
+        - New or unfamiliar pest/disease issues
+        """)
 
 # Footer
 st.markdown("---")
